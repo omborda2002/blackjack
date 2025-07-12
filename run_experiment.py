@@ -1,153 +1,68 @@
-# Run Experiment
+import argparse
+import os
+from termcolor import cprint
 from blackjack_env import BlackjackEnv
 from q_learning_agent import QLearningAgent
-from utils import init_logger, log_episode, summarize_logs, plot_logs
+from utils import evaluate_agent, log_results, save_q_table
 
-try:
-    from termcolor import colored
-except ImportError:
-    def colored(text, color):
-        return text
 
-def train_agent(
-    num_episodes=20000,
-    scenario_name="basic_strategy",
-    log_dir="logs",
-    use_counting=False,
-    dealer_hits_soft_17=True,
-    blackjack_payout=(1, 1),
-    use_true_count=False,
-    decks=1
-):
-    env = BlackjackEnv(
-        use_counting=use_counting,
-        dealer_hits_soft_17=dealer_hits_soft_17,
-        blackjack_payout=blackjack_payout,
-        use_true_count=use_true_count,
-        decks=decks
-    )
-    agent = QLearningAgent(
-        actions=env.action_space,
-        alpha=0.05,           # Lower learning rate for stability
-        gamma=0.95,           # Higher discount factor
-        epsilon=1.0,          # Start with full exploration
-        epsilon_decay=0.9999, # Slower decay for more exploration
-        epsilon_min=0.01      # Lower minimum for less randomness
-    )
-    log_path = init_logger(log_dir=log_dir, scenario=scenario_name)
+def train_agent(strategy_name, env_kwargs, num_episodes=50000, eval_episodes=10000):
+    cprint(f"▶ Training Started: {strategy_name}", "cyan", attrs=["bold"])
+    env = BlackjackEnv(**env_kwargs)
+    agent = QLearningAgent(env)
+    log_path = log_results(strategy_name, agent, env, num_episodes)
 
-    print(colored(f"\n▶ Training Started: {scenario_name}", "blue"))
-    
-    # Track performance over time
-    performance_window = []
-    
-    for episode in range(1, num_episodes + 1):
-        state, _ = env.reset()
-        total_reward = 0
-        steps = 0
-        done = False
+    save_q_table(agent, f"logs/{strategy_name}_q_table.pkl")
 
-        while not done:
-            action = agent.select_action(state)
-            next_state, reward, done, info = env.step(action)
-            agent.update(state, action, reward, next_state)
-            state = next_state
-            total_reward += reward
-            steps += 1
+    cprint(f"✅ Completed: {strategy_name}", "green")
+    cprint(f"🔍 Evaluating {strategy_name} ({eval_episodes:,} episodes)...", "blue")
+    avg_reward, win_rate, profit_per_hour = evaluate_agent(agent, env, eval_episodes)
 
-        agent.decay_epsilon()
-        log_episode(log_path, episode, total_reward, steps, total_reward > 0)
-        
-        # Track recent performance
-        performance_window.append(total_reward)
-        if len(performance_window) > 1000:
-            performance_window.pop(0)
+    print("📊 Evaluation Results:")
+    with open(f"logs/{strategy_name}_summary.csv", "w") as f:
+        f.write("strategy,avg_reward,win_rate,profit,q_table_size\n")
+        f.write(f"{strategy_name},{avg_reward:.4f},{win_rate:.2f},{profit_per_hour:.2f},{len(agent.q_table)}\n")
 
-        if episode % 5000 == 0:
-            recent_avg = sum(performance_window) / len(performance_window)
-            print(f"[{scenario_name}] Ep {episode:6d} | Recent Avg: {recent_avg:+.4f} | Eps: {agent.epsilon:.4f} | Q-States: {len(agent.q_table)}")
-        elif episode % 1000 == 0:
-            print(f"[{scenario_name}] Ep {episode:6d} | Reward: {total_reward:+4.1f} | Steps: {steps} | Eps: {agent.epsilon:.4f}")
 
-    summary = summarize_logs(log_path)
-    print(colored(f"\n✅ Completed: {scenario_name}", "green"))
-    print(f"[Summary] Episodes: {summary['episodes']} | Avg Reward: {summary['avg_reward']:.3f} | Win Rate: {summary['win_rate']:.2%}")
+    print(f"    Average Reward: {avg_reward:.4f}")
+    print(f"    Win Rate: {win_rate:.2f}%")
+    print(f"    Expected Profit/Hour: ${profit_per_hour:.2f}")
+    print(f"    Q-Table Size: {len(agent.q_table)} states")
+    print(f"    Final Epsilon: {agent.epsilon:.4f}")
 
-    # Save trained model
-    agent.save(f"{log_dir}/{scenario_name}_qtable.pkl")
-    
-    # Evaluation phase with no exploration
-    print(f"🔍 Evaluating {scenario_name} (10,000 episodes)...")
-    original_epsilon = agent.epsilon
-    agent.epsilon = 0.0  # No exploration during evaluation
-    
-    eval_rewards = []
-    eval_wins = 0
-    
-    for eval_episode in range(10000):
-        state, _ = env.reset()
-        episode_reward = 0
-        done = False
-        
-        while not done:
-            action = agent.select_action(state)
-            state, reward, done, info = env.step(action)
-            episode_reward += reward
-        
-        eval_rewards.append(episode_reward)
-        if episode_reward > 0:
-            eval_wins += 1
-    
-    agent.epsilon = original_epsilon  # Restore epsilon
-    
-    avg_eval_reward = sum(eval_rewards) / len(eval_rewards)
-    eval_win_rate = eval_wins / len(eval_rewards)
-    
-    print(f"📊 Evaluation Results:")
-    print(f"    Average Reward: {avg_eval_reward:.4f}")
-    print(f"    Win Rate: {eval_win_rate:.2%}")
-    print(f"    Expected Profit/Hour: ${avg_eval_reward * 100:.2f}")
-    
-    plot_logs(log_path)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--strategy", type=str, default="all",
+                        help="Strategy to train: basic_strategy, counting_strategy, tough_casino, or all")
+    parser.add_argument("--episodes", type=int, default=50000, help="Number of training episodes")
+    parser.add_argument("--eval_episodes", type=int, default=10000, help="Number of evaluation episodes")
+    args = parser.parse_args()
+
+    strategies = {
+        "basic_strategy": {
+            "use_counting": False,
+        },
+        "counting_strategy": {
+            "use_counting": True,
+            "use_bet_scaling": True,
+        },
+        "tough_casino": {
+            "use_counting": True,
+            "toughest": True,
+        },
+    }
+
+    if args.strategy == "all":
+        selected = strategies.items()
+    elif args.strategy in strategies:
+        selected = [(args.strategy, strategies[args.strategy])]
+    else:
+        raise ValueError(f"Unknown strategy: {args.strategy}")
+
+    for strategy_name, env_kwargs in selected:
+        train_agent(strategy_name, env_kwargs, args.episodes, args.eval_episodes)
 
 
 if __name__ == "__main__":
-    # Increased episodes for better convergence
-    print("Starting BlackJack RL Training with Enhanced Parameters")
-    
-    # Basic Strategy (50k episodes)
-    train_agent(num_episodes=50000, scenario_name="basic_strategy")
-    
-    # Card Counting Strategy (75k episodes)
-    train_agent(num_episodes=75000, scenario_name="counting_strategy", use_counting=True)
-    
-    # Rule Variation 1: Dealer stands on soft 17, better payout
-    train_agent(
-        num_episodes=50000,
-        scenario_name="variant_strategy",
-        use_counting=True,
-        dealer_hits_soft_17=False,
-        blackjack_payout=(3, 2)
-    )
-    
-    # True Count Strategy with multiple decks
-    train_agent(
-        num_episodes=75000,
-        scenario_name="true_count_strategy",
-        use_counting=True,
-        use_true_count=True,
-        decks=6,
-        dealer_hits_soft_17=False,
-        blackjack_payout=(3, 2)
-    )
-    
-    # Enhanced Strategy with all optimizations
-    train_agent(
-        num_episodes=100000,
-        scenario_name="enhanced_strategy",
-        use_counting=True,
-        use_true_count=True,
-        decks=6,
-        dealer_hits_soft_17=False,
-        blackjack_payout=(3, 2)
-    )
+    main()

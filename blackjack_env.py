@@ -1,19 +1,9 @@
-# blackjack_env.py
 import random
 
 class BlackjackEnv:
-    def __init__(
-        self,
-        use_counting=False,
-        dealer_hits_soft_17=True,
-        blackjack_payout=(1, 1),
-        use_true_count=False,
-        decks=1,
-        use_bet_scaling=False,
-        eps_floor=0.05,
-        reward_shaping=False,
-        use_basic_heuristic=False
-    ):
+    def __init__(self, use_counting=False, dealer_hits_soft_17=True, blackjack_payout=(3, 2),
+                 use_true_count=False, decks=1, use_bet_scaling=False, eps_floor=0.05,
+                 reward_shaping=False, toughest=False):
         self.use_counting = use_counting
         self.dealer_hits_soft_17 = dealer_hits_soft_17
         self.blackjack_payout = blackjack_payout
@@ -21,136 +11,140 @@ class BlackjackEnv:
         self.decks = decks
         self.use_bet_scaling = use_bet_scaling
         self.reward_shaping = reward_shaping
-        self.use_basic_heuristic = use_basic_heuristic
         self.eps_floor = eps_floor
         self.running_count = 0
-        self.action_space = [0, 1, 2]  # 0: Stand, 1: Hit, 2: Double Down
-        self.can_double = True
+        self.cards_dealt = 0
+        self.total_cards = 52 * decks
+        self.action_space = [0, 1, 2]  # 0: Stand, 1: Hit, 2: Double
+        self.bet = 1
+        self.shuffle_deck()
+        if toughest:
+            self.apply_toughest_rules()
         self.reset()
+
+    def apply_toughest_rules(self):
+        self.blackjack_payout = (1, 1)
+        self.dealer_hits_soft_17 = True
+        self.decks = 8
+        self.total_cards = 52 * self.decks
+        self.use_bet_scaling = True
+        self.shuffle_deck()
+
+        # Additional tough rules
+        self.restricted_double = True  # Only allow doubling on 9, 10, 11
+        self.surrender_allowed = False
+        self.dealer_wins_push = True
+        self.penetration_limit = 0.75
+        self.no_resplit_aces = True
+
+    def shuffle_deck(self):
+        self.deck = [rank for rank in range(1, 14)] * 4 * self.decks
+        random.shuffle(self.deck)
+        self.running_count = 0
+        self.cards_dealt = 0
+
+    def draw_card(self):
+        if self.cards_dealt >= self.total_cards * 0.75:
+            self.shuffle_deck()
+        card = self.deck.pop()
+        self.cards_dealt += 1
+        if self.use_counting:
+            self.running_count += self.card_count_value(card)
+        return min(card, 10)
+
+    def card_count_value(self, card):
+        if 2 <= card <= 6:
+            return 1
+        elif card >= 10 or card == 1:
+            return -1
+        else:
+            return 0
+
+    def hand_value(self, hand):
+        total, aces = 0, hand.count(1)
+        for card in hand:
+            total += 11 if card == 1 else card
+        while total > 21 and aces:
+            total -= 10
+            aces -= 1
+        return total
+
+    def get_true_count(self):
+        remaining_decks = max(1, (self.total_cards - self.cards_dealt) / 52)
+        return self.running_count / remaining_decks
 
     def reset(self):
         self.player = [self.draw_card(), self.draw_card()]
         self.dealer = [self.draw_card(), self.draw_card()]
         self.done = False
-        self.can_double = True  # Can double on first turn
-        self.update_count(self.player + self.dealer)
-        return self.get_obs(), {}
+        self.can_double = True
+        self.bet = 1
 
-    def draw_card(self):
-        card = random.randint(1, 10)
-        self.update_count([card])
-        return card
+        if self.use_bet_scaling:
+            true_count = self.get_true_count() if self.use_true_count else self.running_count
+            self.bet = min(max(1, int(true_count)), 5)  # Cap bet between 1 and 5
 
-    def update_count(self, cards):
-        if self.use_counting:
-            for card in cards:
-                if 2 <= card <= 6:
-                    self.running_count += 1
-                elif card == 10 or card == 1:
-                    self.running_count -= 1
-
-    def get_true_count(self):
-        return self.running_count / self.decks if self.use_true_count else self.running_count
-
-    def sum_hand(self, hand):
-        total = sum(hand)
-        if 1 in hand and total + 10 <= 21:
-            return total + 10
-        return total
-
-    def is_bust(self, hand):
-        return self.sum_hand(hand) > 21
-
-    def is_blackjack(self, hand):
-        return sorted(hand) == [1, 10]
+        return self.get_obs()
 
     def get_obs(self):
-        player_sum = self.sum_hand(self.player)
-        dealer_up = self.dealer[0]
-        
-        # Check for usable ace (soft hand)
-        has_usable_ace = 1 in self.player and player_sum != sum(self.player)
-        
-        # Basic state representation
-        obs = (player_sum, dealer_up, has_usable_ace)
-        
-        if self.use_counting:
-            true_count = self.get_true_count()
-            # Discretize true count to reduce state space
-            count_bucket = max(-5, min(5, int(round(true_count))))
-            obs += (count_bucket,)
-        
-        return obs
-
-    def get_bet(self):
+        obs = (self.hand_value(self.player), self.dealer[0], 1 in self.player)
         if self.use_bet_scaling:
-            count = self.get_true_count()
-            scaled_bet = 1 + max(0, int(count))
-            return min(scaled_bet, 5)  # Cap max bet to 5 units
-        return 1
+            count_bucket = min(5, max(-5, int(self.get_true_count())))
+            return obs + (self.bet, count_bucket)
+        if self.use_bet_scaling:
+            return obs + (self.bet,)
+        return obs
 
     def step(self, action):
         if self.done:
-            raise ValueError("Game has ended. Call reset().")
-
-        bet = self.get_bet()
+            return self.get_obs(), 0, True, {}
 
         if action == 1:  # Hit
             self.player.append(self.draw_card())
-            self.can_double = False  # Can't double after hitting
-            if self.is_bust(self.player):
+            if self.hand_value(self.player) > 21:
                 self.done = True
-                reward = -1 * bet
-                if self.reward_shaping and self.sum_hand(self.player[:-1]) <= 11:
-                    reward += 0.2  # reward drawing when safe
-                return self.get_obs(), reward, True, {"bet": bet, "action": "hit_bust"}
-            else:
-                return self.get_obs(), 0, False, {"bet": bet, "action": "hit"}
-                
-        elif action == 2 and self.can_double:  # Double Down
+                return self.get_obs(), -1 * self.bet, True, {"result": "bust"}
+            return self.get_obs(), 0, False, {}
+
+        elif action == 2 and self.can_double and (not hasattr(self, 'restricted_double') or self.hand_value(self.player) in [9, 10, 11]):  # Double
             self.player.append(self.draw_card())
+            self.can_double = False
             self.done = True
-            bet *= 2  # Double the bet
-            
-            if self.is_bust(self.player):
-                return self.get_obs(), -1 * bet, True, {"bet": bet, "action": "double_bust"}
-            
-            # Dealer plays
-            while self.sum_hand(self.dealer) < 17 or (self.sum_hand(self.dealer) == 17 and self.dealer_hits_soft_17 and 1 in self.dealer):
-                self.dealer.append(self.draw_card())
-            
-            player_score = self.sum_hand(self.player)
-            dealer_score = self.sum_hand(self.dealer)
-            
-            if self.is_bust(self.dealer) or player_score > dealer_score:
-                reward = 1 * bet
-            elif player_score == dealer_score:
-                reward = 0
-            else:
-                reward = -1 * bet
-                
-            return self.get_obs(), reward, True, {"bet": bet, "action": "double"}
-            
-        else:  # Stand (action == 0 or invalid double)
-            if action == 2 and not self.can_double:
-                # Invalid double, treat as stand
-                pass
-                
-            while self.sum_hand(self.dealer) < 17 or (self.sum_hand(self.dealer) == 17 and self.dealer_hits_soft_17 and 1 in self.dealer):
-                self.dealer.append(self.draw_card())
+            return self.resolve_hand(double=True)
+
+        elif action == 0 or not self.can_double:  # Stand
             self.done = True
+            return self.resolve_hand()
+        else:
+            return self.get_obs(), 0, False, {}
 
-            player_score = self.sum_hand(self.player)
-            dealer_score = self.sum_hand(self.dealer)
+    def resolve_hand(self, double=False):
+        while self.hand_value(self.dealer) < 17 or (self.dealer_hits_soft_17 and self.hand_value(self.dealer) == 17 and 1 in self.dealer):
+            self.dealer.append(self.draw_card())
 
-            if self.is_bust(self.dealer) or player_score > dealer_score:
-                if self.is_blackjack(self.player):
-                    reward = self.blackjack_payout[0] / self.blackjack_payout[1]
-                else:
-                    reward = 1
-            elif player_score == dealer_score:
-                reward = 0
+        player_score = self.hand_value(self.player)
+        dealer_score = self.hand_value(self.dealer)
+        reward = 0
+
+        if player_score > 21:
+            reward = -1
+        elif dealer_score > 21 or player_score > dealer_score:
+            reward = 1.5 if self.blackjack_payout == (3, 2) and len(self.player) == 2 and player_score == 21 else 1
+        elif player_score == dealer_score:
+            if hasattr(self, 'dealer_wins_push') and self.dealer_wins_push:
+                reward = -1  # Push goes to dealer
             else:
-                reward = -1
+                reward = 0
+            reward = 0
+        else:
+            reward = -1
 
-            return self.get_obs(), reward * bet, True, {"bet": bet, "action": "stand"}
+        if double:
+            reward *= 2
+
+        if self.reward_shaping:
+            if reward > 0:
+                reward += 0.1
+            elif 'bust' in info.get('result', ''):
+                reward -= 0.1
+        return self.get_obs(), reward * self.bet, True, {"dealer_score": dealer_score, "player_score": player_score}

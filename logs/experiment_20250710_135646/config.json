@@ -1,9 +1,0 @@
-{
-  "quick_mode": false,
-  "experiment_type": "all",
-  "timestamp": "2025-07-10T13:56:46.782227",
-  "parameters": {
-    "training_episodes": 50000,
-    "evaluation_episodes": 10000
-  }
-}

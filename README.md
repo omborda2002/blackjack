@@ -1,175 +1,155 @@
-# BlackJack Reinforcement Learning Project
-
-This project implements a reinforcement learning-based BlackJack player as part of Portfolio Exam 3 for the course "Reasoning and Decision Making under Uncertainty" at THWS.
+# Enhanced Blackjack Reinforcement Learning System
 
 ## Overview
 
-The implementation includes:
+This enhanced blackjack RL system implements multiple difficulty levels, from player-favorable basic strategy to the most challenging casino conditions possible. The system is designed to evaluate how different rule variations affect optimal play and expected returns.
 
-1. **Basic Strategy Learning** - Q-learning agent that learns optimal BlackJack basic strategy
-2. **Complete Point-Count System** - Advanced agent with Hi-Lo card counting capabilities  
-3. **Rule Variations Analysis** - Testing different BlackJack rule sets and their impact
-4. **Enhanced Profit System** - Optimized system for maximum expected profit
+## Key Features
 
-## Project Structure
+### 🎯 Multiple Difficulty Levels
+- **Basic Strategy**: Standard favorable rules for baseline comparison
+- **Counting Strategy**: Card counting with reasonable casino rules
+- **Tough Casino**: Moderately unfavorable rules
+- **Toughest Casino**: Extremely unfavorable rules with multiple disadvantages
+- **Nightmare Casino**: The ultimate challenge with maximum house edge
 
-```
-blackjack_rl/
-├── blackjack_env.py        # BlackJack environment with rule variations
-├── q_learning_agent.py     # Q-learning agents (basic + card counting)
-├── run_experiment.py       # Main experiment runner
-├── utils.py                # Utilities for logging and visualization
-├── requirements.txt        # Python dependencies
-├── README.md              # This file
-└── logs/                  # Experiment results and logs
-```
+### 🃏 Advanced Casino Rules Implementation
+- **Continuous Shuffling Machine**: Completely neutralizes card counting
+- **Dealer Wins Ties**: Pushes become losses for the player
+- **Restricted Doubling**: Only allowed on 9, 10, 11
+- **Reduced Blackjack Payouts**: From 3:2 down to even money (1:1)
+- **House Edge Boost**: Additional mathematical disadvantage
+- **Multi-deck Shoes**: Up to 8 decks with varying shuffle penetration
 
-## Requirements
+### 🧠 Intelligent Agent Features
+- **True Count Calculation**: Accurate card counting implementation
+- **Bet Scaling**: Dynamic betting based on count (when not defeated by CSM)
+- **State Space Optimization**: Efficient Q-table representation
+- **Adaptive Learning**: Epsilon-greedy with decay
 
-- Python 3.7+
-- NumPy
-- Matplotlib
-- JSON (built-in)
+## Strategy Comparison
 
-Install dependencies:
+| Strategy | Decks | BJ Payout | Dealer S17 | Special Rules | Expected Difficulty |
+|----------|-------|-----------|------------|---------------|-------------------|
+| Basic | 1 | 3:2 | ✅ | None | Easy |
+| Counting | 6 | 3:2 | ✅ | Card counting | Moderate |
+| Tough | 8 | 6:5 | ❌ | Dealer hits soft 17 | Hard |
+| Toughest | 8 | 6:5 | ❌ | CSM, Dealer wins ties, Limited doubling | Very Hard |
+| Nightmare | 8 | 1:1 | ❌ | All toughest rules + Even money BJ | Extreme |
+
+## Installation & Usage
+
+### Prerequisites
 ```bash
 pip install -r requirements.txt
 ```
 
-## Usage
-
-### Run All Experiments
+### Basic Usage
 ```bash
+# Run all strategies
 python run_experiment.py
+
+# Run specific strategy
+python run_experiment.py --strategy toughest_casino
+
+# Custom training parameters
+python run_experiment.py --episodes 100000 --eval-episodes 20000
 ```
 
-### Run Specific Experiment
-```bash
-python run_experiment.py --experiment basic      # Basic strategy only
-python run_experiment.py --experiment counting   # Card counting only
-python run_experiment.py --experiment variations # Rule variations only
-python run_experiment.py --experiment enhanced   # Enhanced system only
+### Advanced Configuration
+```python
+# Example: Custom ultra-tough casino
+env = BlackjackEnv(
+    use_counting=True,
+    use_true_count=True,
+    use_bet_scaling=True,
+    toughest=True,
+    dealer_hits_soft_17=True,
+    blackjack_payout=(1, 1),  # Even money
+    decks=8
+)
 ```
 
-### Quick Test Run
-```bash
-python run_experiment.py --quick
+## What Makes "Toughest Casino" Actually Tough
+
+The original implementation had several issues that made it less challenging:
+
+### ❌ Original Issues:
+1. **Blackjack payout contradiction**: Set to (1,1) then overridden to (6,5)
+2. **Limited rule enforcement**: Many tough rules weren't actually implemented
+3. **Ineffective card counting countermeasures**: Simple deck management
+4. **Missing key disadvantages**: No tie-breaking rules, limited house edge manipulation
+
+### ✅ Enhanced Implementation:
+1. **Continuous Shuffling Machine**: Shuffles every 10 cards, completely defeating card counting
+2. **Dealer Wins Ties**: All pushes become losses (-100% on ties)
+3. **Restricted Doubling**: Only on 9, 10, 11 (industry worst practice)
+4. **Reduced Blackjack Payouts**: Down to 6:5 or even 1:1 (even money)
+5. **House Edge Boost**: Mathematical 2% additional disadvantage on losses
+6. **Bet Scaling Limits**: Maximum 2x bet ratio instead of 5x
+7. **Blackjack Frequency Reduction**: Some face cards randomly become 9s
+8. **Late Shuffle Point**: 75% penetration hurts counting effectiveness
+
+## Expected Results
+
+With the enhanced tough rules, you should see:
+
+```
+📊 Expected Performance Ranking (worst to best):
+1. nightmare_casino:  -0.15 to -0.20 avg reward
+2. toughest_casino:   -0.12 to -0.18 avg reward  
+3. tough_casino:      -0.08 to -0.12 avg reward
+4. counting_strategy: -0.02 to +0.02 avg reward
+5. basic_strategy:    -0.01 to +0.01 avg reward
 ```
 
-## Experiments
+## Research Applications
 
-### 1. Basic Strategy Learning
-- **Objective**: Learn optimal basic BlackJack strategy using Q-learning
-- **Agent**: Standard Q-learning with epsilon-greedy exploration
-- **Training**: 50,000 episodes
-- **Evaluation**: 10,000 episodes
-- **Expected Results**: Win rate ~43-47%, slight negative expected value
+This system is perfect for academic research on:
+- **Rule Variation Impact**: How individual rule changes affect optimal strategy
+- **Card Counting Effectiveness**: Measuring countermeasure success
+- **Reinforcement Learning Robustness**: Agent adaptation to adverse conditions
+- **Casino Game Theory**: Mathematical analysis of house edge modifications
 
-### 2. Complete Point-Count System
-- **Objective**: Implement Hi-Lo card counting with Q-learning
-- **Agent**: Enhanced Q-learning with true count in state space
-- **Features**: 
-  - Running count tracking
-  - True count calculation
-  - Betting strategy based on count
-- **Training**: 75,000 episodes
-- **Expected Results**: Positive expected value with proper betting
+## File Structure
 
-### 3. Rule Variations Analysis
-Tests two rule variations and their impact on strategy:
+```
+blackjack_rl/
+├── blackjack_env.py        # Enhanced environment with tough rules
+├── q_learning_agent.py     # Q-learning implementation
+├── run_experiment.py       # Enhanced experiment runner
+├── utils.py               # Logging and evaluation utilities
+├── requirements.txt       # Dependencies
+└── logs/                 # Training logs and results
+```
 
-#### Variation 1: Surrender Allowed
-- **Rule**: Player can surrender hand for 50% loss
-- **Impact**: Should improve player's expected value slightly
-- **Strategy Changes**: Surrender on hard 16 vs dealer 9,10,A
+## Advanced Features
 
-#### Variation 2: No Double After Split
-- **Rule**: Cannot double down after splitting pairs
-- **Impact**: Reduces player's expected value
-- **Strategy Changes**: More conservative splitting strategy
+### 🔬 Research Mode
+```python
+# Enable detailed logging for research
+env = BlackjackEnv(toughest=True, reward_shaping=True)
+agent = QLearningAgent(env, alpha=0.05, epsilon_decay=0.9995)
+```
 
-### 4. Enhanced Profit System
-- **Objective**: Maximize expected profit through optimized parameters
-- **Features**:
-  - Optimized deck composition (4 decks, 80% penetration)
-  - Fine-tuned learning parameters
-  - Extended training (100,000 episodes)
-  - Advanced betting strategy
+### 📊 Analysis Tools
+- **Q-table size tracking**: Monitor state space exploration
+- **Win rate analysis**: Detailed performance metrics
+- **Profit/hour calculation**: Real-world applicability
+- **Rule impact measurement**: Isolate individual rule effects
 
-## Results and Analysis
+## Contributing
 
-After running experiments, results are saved in the `logs/` directory with timestamp:
+When adding new rules or modifications:
+1. Ensure mathematical correctness of house edge calculations
+2. Test against known basic strategy benchmarks
+3. Document rule interactions and precedence
+4. Add appropriate evaluation metrics
 
-- **Training Progress Plots**: Learning curves, epsilon decay, win rates
-- **Strategy Comparison**: Performance comparison across all methods
-- **Rule Variation Analysis**: Impact of different rules on performance
-- **Results Summary**: Comprehensive JSON and text reports
-- **Model Files**: Trained Q-tables for each agent
+## License
 
-## Key Metrics
+This implementation is for educational and research purposes. Please check local gambling regulations before any commercial use.
 
-For each strategy, the following metrics are calculated:
+---
 
-- **Win Rate**: Percentage of hands won
-- **Average Reward**: Expected reward per hand
-- **Expected Profit**: Estimated profit per hour of play
-- **Q-table Size**: Number of unique states learned
-
-## Implementation Details
-
-### State Representation
-- **Basic Agent**: (player_sum, dealer_up_card, usable_ace)
-- **Card Counting Agent**: (player_sum, dealer_up_card, usable_ace, true_count, action_flags)
-
-### Action Space
-- 0: Stand
-- 1: Hit  
-- 2: Double Down
-- 3: Split (when applicable)
-- 4: Surrender (when applicable)
-
-### Card Counting System
-- **Hi-Lo System**: +1 for low cards (2-6), -1 for high cards (10,J,Q,K,A), 0 for neutral (7,8,9)
-- **True Count**: Running count divided by estimated decks remaining
-- **Betting Strategy**: Bet size scales with positive true count
-
-## Expected Performance
-
-Based on theoretical BlackJack analysis:
-
-1. **Basic Strategy**: ~-0.5% house edge (win rate ~43-47%)
-2. **Card Counting**: ~+0.5% to +1.5% player edge with proper betting
-3. **Rule Variations**: 
-   - Surrender: Improves by ~0.1%
-   - No DAS: Reduces by ~0.1-0.2%
-4. **Enhanced System**: Target +1% to +2% player edge
-
-## Academic Context
-
-This implementation addresses the Portfolio Exam 3 requirements:
-
-1. ✅ **Basic Strategy Learning** - Q-learning implementation
-2. ✅ **Complete Point-Count System** - Hi-Lo card counting integration
-3. ✅ **Rule Variations** - Surrender and Double-After-Split analysis
-4. ✅ **Profit Optimization** - Enhanced system with improved parameters
-5. ✅ **No External RL Frameworks** - Pure Python implementation
-6. ✅ **Comprehensive Logging** - Detailed results and analysis
-
-## Usage Notes
-
-- The system is optimized for research, not human play
-- Card counting is legal but may be restricted in casinos
-- Results are based on simulation and may vary with different random seeds
-- For academic purposes only
-
-## References
-
-- Sutton, R. S., & Barto, A. G. (2018). Reinforcement Learning: An Introduction
-- Thorp, E. O. (1966). Beat the Dealer
-- Basic Strategy charts and optimal play analysis
-
-## Author
-
-Student Implementation for THWS Portfolio Exam 3  
-Course: Reasoning and Decision Making under Uncertainty  
-Summer 2025
+*"The house always wins... but how much depends on the rules."*
