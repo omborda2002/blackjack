@@ -88,11 +88,6 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Project-specific
-# Logs and results
-logs/
-*.log
-
 # Trained models
 *.joblib
 *.h5
