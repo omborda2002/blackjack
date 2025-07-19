@@ -1,155 +1,115 @@
-# Enhanced Blackjack Reinforcement Learning System
+# Blackjack Reinforcement Learning Agent
 
-## Overview
+This project implements a self-learning Blackjack agent using **Q-Learning** and explores various strategies including **card counting** and **rule variations**. The agent learns optimal play policies through simulation and logs performance metrics for analysis.
 
-This enhanced blackjack RL system implements multiple difficulty levels, from player-favorable basic strategy to the most challenging casino conditions possible. The system is designed to evaluate how different rule variations affect optimal play and expected returns.
+---
 
-## Key Features
+## 📁 Project Structure
 
-### 🎯 Multiple Difficulty Levels
-- **Basic Strategy**: Standard favorable rules for baseline comparison
-- **Counting Strategy**: Card counting with reasonable casino rules
-- **Tough Casino**: Moderately unfavorable rules
-- **Toughest Casino**: Extremely unfavorable rules with multiple disadvantages
-- **Nightmare Casino**: The ultimate challenge with maximum house edge
+```
+blackjack_rl/
+├── blackjack_env.py              # Blackjack game environment
+├── q_learning_agent.py          # Q-learning agent with optional counting
+├── run_experiment.py            # Runs all strategy experiments
+├── utils.py                     # Logging, evaluation, saving/loading Q-tables
+├── plots.py                     # Generates reward/win rate plots and summary CSV
+├── requirements.txt             # Dependencies list
+├── README.md                    # This file
+├── figures/                     # Output plots + summary CSV
+│   ├── cumulative_reward_plot.png
+│   ├── rolling_winrate_plot.png
+│   └── strategy_summary.csv
+├── logs/                        # Training logs and Q-tables
+│   ├── *.csv
+│   ├── *_q_table.pkl
+```
 
-### 🃏 Advanced Casino Rules Implementation
-- **Continuous Shuffling Machine**: Completely neutralizes card counting
-- **Dealer Wins Ties**: Pushes become losses for the player
-- **Restricted Doubling**: Only allowed on 9, 10, 11
-- **Reduced Blackjack Payouts**: From 3:2 down to even money (1:1)
-- **House Edge Boost**: Additional mathematical disadvantage
-- **Multi-deck Shoes**: Up to 8 decks with varying shuffle penetration
+---
 
-### 🧠 Intelligent Agent Features
-- **True Count Calculation**: Accurate card counting implementation
-- **Bet Scaling**: Dynamic betting based on count (when not defeated by CSM)
-- **State Space Optimization**: Efficient Q-table representation
-- **Adaptive Learning**: Epsilon-greedy with decay
+## 🚀 Getting Started
 
-## Strategy Comparison
+### 1. Install Dependencies
 
-| Strategy | Decks | BJ Payout | Dealer S17 | Special Rules | Expected Difficulty |
-|----------|-------|-----------|------------|---------------|-------------------|
-| Basic | 1 | 3:2 | ✅ | None | Easy |
-| Counting | 6 | 3:2 | ✅ | Card counting | Moderate |
-| Tough | 8 | 6:5 | ❌ | Dealer hits soft 17 | Hard |
-| Toughest | 8 | 6:5 | ❌ | CSM, Dealer wins ties, Limited doubling | Very Hard |
-| Nightmare | 8 | 1:1 | ❌ | All toughest rules + Even money BJ | Extreme |
-
-## Installation & Usage
-
-### Prerequisites
 ```bash
 pip install -r requirements.txt
 ```
 
-### Basic Usage
+### 2. Train All Strategies
+
 ```bash
-# Run all strategies
 python run_experiment.py
-
-# Run specific strategy
-python run_experiment.py --strategy toughest_casino
-
-# Custom training parameters
-python run_experiment.py --episodes 100000 --eval-episodes 20000
 ```
 
-### Advanced Configuration
-```python
-# Example: Custom ultra-tough casino
-env = BlackjackEnv(
-    use_counting=True,
-    use_true_count=True,
-    use_bet_scaling=True,
-    toughest=True,
-    dealer_hits_soft_17=True,
-    blackjack_payout=(1, 1),  # Even money
-    decks=8
-)
+This will train and evaluate five strategies:
+
+* Basic Strategy
+* Point Count (Hi-Lo)
+* Dealer Hits on Soft 17
+* Double After Split Allowed
+* Improved Point Count (custom weights)
+
+### 3. Generate Plots & Summary Table
+
+```bash
+python plots.py
 ```
 
-## What Makes "Toughest Casino" Actually Tough
+This will create:
 
-The original implementation had several issues that made it less challenging:
-
-### ❌ Original Issues:
-1. **Blackjack payout contradiction**: Set to (1,1) then overridden to (6,5)
-2. **Limited rule enforcement**: Many tough rules weren't actually implemented
-3. **Ineffective card counting countermeasures**: Simple deck management
-4. **Missing key disadvantages**: No tie-breaking rules, limited house edge manipulation
-
-### ✅ Enhanced Implementation:
-1. **Continuous Shuffling Machine**: Shuffles every 10 cards, completely defeating card counting
-2. **Dealer Wins Ties**: All pushes become losses (-100% on ties)
-3. **Restricted Doubling**: Only on 9, 10, 11 (industry worst practice)
-4. **Reduced Blackjack Payouts**: Down to 6:5 or even 1:1 (even money)
-5. **House Edge Boost**: Mathematical 2% additional disadvantage on losses
-6. **Bet Scaling Limits**: Maximum 2x bet ratio instead of 5x
-7. **Blackjack Frequency Reduction**: Some face cards randomly become 9s
-8. **Late Shuffle Point**: 75% penetration hurts counting effectiveness
-
-## Expected Results
-
-With the enhanced tough rules, you should see:
-
-```
-📊 Expected Performance Ranking (worst to best):
-1. nightmare_casino:  -0.15 to -0.20 avg reward
-2. toughest_casino:   -0.12 to -0.18 avg reward  
-3. tough_casino:      -0.08 to -0.12 avg reward
-4. counting_strategy: -0.02 to +0.02 avg reward
-5. basic_strategy:    -0.01 to +0.01 avg reward
-```
-
-## Research Applications
-
-This system is perfect for academic research on:
-- **Rule Variation Impact**: How individual rule changes affect optimal strategy
-- **Card Counting Effectiveness**: Measuring countermeasure success
-- **Reinforcement Learning Robustness**: Agent adaptation to adverse conditions
-- **Casino Game Theory**: Mathematical analysis of house edge modifications
-
-## File Structure
-
-```
-blackjack_rl/
-├── blackjack_env.py        # Enhanced environment with tough rules
-├── q_learning_agent.py     # Q-learning implementation
-├── run_experiment.py       # Enhanced experiment runner
-├── utils.py               # Logging and evaluation utilities
-├── requirements.txt       # Dependencies
-└── logs/                 # Training logs and results
-```
-
-## Advanced Features
-
-### 🔬 Research Mode
-```python
-# Enable detailed logging for research
-env = BlackjackEnv(toughest=True, reward_shaping=True)
-agent = QLearningAgent(env, alpha=0.05, epsilon_decay=0.9995)
-```
-
-### 📊 Analysis Tools
-- **Q-table size tracking**: Monitor state space exploration
-- **Win rate analysis**: Detailed performance metrics
-- **Profit/hour calculation**: Real-world applicability
-- **Rule impact measurement**: Isolate individual rule effects
-
-## Contributing
-
-When adding new rules or modifications:
-1. Ensure mathematical correctness of house edge calculations
-2. Test against known basic strategy benchmarks
-3. Document rule interactions and precedence
-4. Add appropriate evaluation metrics
-
-## License
-
-This implementation is for educational and research purposes. Please check local gambling regulations before any commercial use.
+* `figures/cumulative_reward_plot.png`
+* `figures/rolling_winrate_plot.png`
+* `figures/strategy_summary.csv`
 
 ---
 
-*"The house always wins... but how much depends on the rules."*
+## 📊 Evaluation Metrics
+
+After each training run, the agent is evaluated on:
+
+* **Average Reward per Game**
+* **Win Rate (%)**
+* **Profit per Hour (€)** (assuming 100 hands/hour)
+
+These metrics appear both in console output and the summary CSV.
+
+---
+
+## 🧠 Strategy Modes Explained
+
+| Strategy                       | Description                                         |
+| ------------------------------ | --------------------------------------------------- |
+| `basic_strategy`               | Pure state-based Q-learning (no memory)             |
+| `point_count`                  | Adds Hi-Lo running count as a state feature         |
+| `variation_hits_soft_17`       | Dealer hits on soft 17 rule tested                  |
+| `variation_double_after_split` | Double-down allowed after splits                    |
+| `improved_point_count`         | Uses custom weights (e.g. +2 for 5,6; -2 for 10,11) |
+
+---
+
+## 💾 Reproducibility
+
+* Logs are saved as `.csv` in `logs/`
+* Q-tables are saved as `.pkl` files per strategy
+* All results are deterministic based on random seed unless modified
+
+---
+
+## 📌 Notes
+
+* All agents use **epsilon-greedy** exploration with decay
+* Bets are scaled based on the **true count** if enabled in the environment
+* No external RL libraries were used (per exam rules)
+
+---
+
+## 👨‍🏫 Author
+
+**Om Sanjaybhai Borda**
+Technical University of Applied Sciences Würzburg-Schweinfurt
+Email: [om.borda@study.thws.de](mailto:om.borda@study.thws.de)
+
+---
+
+## 📜 License
+
+This project is part of the Portfolio Exam 3 for *Reasoning and Decision Making under Uncertainty (Summer 2025)* and is submitted to Prof. Dr. Frank Deinzer.
