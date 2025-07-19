@@ -1,0 +1,6 @@
+strategy,total_reward,Win Rate (%),Profit/hr (€)
+basic_strategy,-0.1714,37.51,-17.14
+improved_point_count,-0.18596,36.47,-18.596
+point_count,-0.15726,37.936,-15.726
+variation_double_after_split,-0.16196,37.562,-16.195999999999998
+variation_hits_soft_17,-0.15065,38.286,-15.065000000000001

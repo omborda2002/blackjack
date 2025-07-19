@@ -92,22 +92,12 @@ dmypy.json
 # Logs and results
 logs/
 *.log
-*.csv
 
 # Trained models
-*.pkl
 *.joblib
 *.h5
 *.pt
 *.pth
-
-# Plots and visualizations
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.svg
-*.pdf
 
 # Data files
 data/
